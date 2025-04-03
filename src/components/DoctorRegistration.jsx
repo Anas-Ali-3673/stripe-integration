@@ -1,44 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 export default function DoctorRegistration() {
+  const { user, token } = useAuth();
   const [doctorId, setDoctorId] = useState('');
   const [email, setEmail] = useState('');
   const [onboardingUrl, setOnboardingUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
-  const [emailError, setEmailError] = useState('');
 
-  // Validate email
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) {
-      setEmailError('Email is required');
-      return false;
-    } else if (!emailRegex.test(email)) {
-      setEmailError('Please enter a valid email address');
-      return false;
+  // Initialize email from the authenticated user
+  useEffect(() => {
+    if (user && user.email) {
+      setEmail(user.email);
     }
-    setEmailError('');
-    return true;
-  };
+  }, [user]);
 
-  // 1️⃣ Create a Connected Account
+  // Create a Connected Account
   const createConnectedAccount = async () => {
-    if (!validateEmail(email)) {
-      return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
+      // Configure axios to send the authorization token
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+      };
+
       const res = await axios.post(
         'http://localhost:5001/api/payments/create-connected-account',
-        { email: email }
+        {}, // No need to send email as it uses the authenticated user
+        config
       );
-      setDoctorId(res.data.id);
+
+      setDoctorId(res.data.id || res.data);
       setStep(2);
     } catch (err) {
       console.error(err);
@@ -55,9 +52,16 @@ export default function DoctorRegistration() {
     setError('');
 
     try {
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+      };
+
       const res = await axios.post(
-        `http://localhost:5001/api/payments/create-onboarding-link/${doctorId}`
+        `http://localhost:5001/api/payments/create-onboarding-link/${doctorId}`,
+        {},
+        config
       );
+
       setOnboardingUrl(res.data.url);
 
       // Save the doctorId to localStorage before redirecting
@@ -121,23 +125,12 @@ export default function DoctorRegistration() {
             >
               Email Address
             </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) validateEmail(e.target.value);
-              }}
-              className={`w-full px-3 py-2 border ${
-                emailError ? 'border-red-300' : 'border-gray-300'
-              } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
-              placeholder="doctor@example.com"
-              required
-            />
-            {emailError && (
-              <p className="mt-1 text-sm text-red-600">{emailError}</p>
-            )}
+            <div className="flex items-center p-2 bg-gray-50 border border-gray-200 rounded">
+              <span className="text-gray-500 text-sm">{email}</span>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              We'll use the email from your account for your Stripe setup.
+            </p>
           </div>
 
           {doctorId && (
@@ -218,7 +211,7 @@ export default function DoctorRegistration() {
                 Creating...
               </>
             ) : (
-              'Create  Account'
+              'Create Account'
             )}
           </button>
 
